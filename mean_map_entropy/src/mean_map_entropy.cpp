@@ -101,35 +101,11 @@ double computePlaneVariance( pcl::PointCloud< PointT >::Ptr cloud ){
 	return meanDistTopQuarter;
 }
 
-
-int main( int argc, char** argv ) {
-
-	pcl::PointCloud< PointT >::Ptr inputCloud (new pcl::PointCloud< PointT >);
-	pcl::PointCloud< PointTypeWithEntropy >::Ptr outputCloud (new pcl::PointCloud< PointTypeWithEntropy >);
-
-	double entropySum = 0.f;
-	double planeVarianceSum = 0.f;
-	int lonelyPoints = 0;
-
-	// get pointcloud
-	std::vector<int> fileIndices = pcl::console::parse_file_extension_argument (argc, argv, ".pcd");
-	if (pcl::io::loadPCDFile< PointT> (argv[fileIndices[0]], *inputCloud) == -1)
-	{
-		PCL_ERROR ("Couldn't read file.\n");
-		return (-1);
-	}
-
-	// get parameters if given
-	int stepSize = 1;
-	double radius = 0.3;
-	int minNeighbors = 15;
-
-	pcl::console::parse_argument (argc, argv, "-stepsize", stepSize);
-    	pcl::console::parse_argument (argc, argv, "-radius", radius);
-	bool punishSolitaryPoints = pcl::console::find_switch (argc, argv, "-punishSolitaryPoints");
-    	pcl::console::parse_argument (argc, argv, "-minNeighbors", minNeighbors);
-
-    	std::cout << "Stepsize = " << stepSize << std::endl;
+void computeEntropyMain(pcl::PointCloud< PointT >::Ptr inputCloud, 
+        pcl::PointCloud< PointTypeWithEntropy >::Ptr outputCloud, 
+		int stepSize = 1, double radius = 0.3, 
+		bool punishSolitaryPoints = false, int minNeighbors = 15) {
+    std::cout << "Stepsize = " << stepSize << std::endl;
 	std::cout << "Radius for neighborhood search = " << radius << std::endl;
 	if( !punishSolitaryPoints ){
 		std::cout << "Paper version" << std::endl;
@@ -144,6 +120,9 @@ int main( int argc, char** argv ) {
 	pcl::KdTreeFLANN< PointT> kdtree;
 	kdtree.setInputCloud (inputCloud);
 
+	double entropySum = 0.f;
+	double planeVarianceSum = 0.f;
+	int lonelyPoints = 0;
 	#pragma omp parallel reduction (+:entropySum, planeVarianceSum, lonelyPoints)
 	{
 		#pragma omp for schedule(dynamic)
@@ -230,14 +209,43 @@ int main( int argc, char** argv ) {
 	if( punishSolitaryPoints && (pointsActuallyUsed < lonelyPoints) ){
 		std::cout << "Used more solitary than not-solitary points to compute the values. You should consider changing the parameters." << std::endl;
 	}
+}
 
+void save(pcl::PointCloud< PointTypeWithEntropy >::Ptr outputCloud, const std::string& pcdFilename) {
 	// save output cloud in the directory of the input cloud
-	std::string saveDestination = argv[fileIndices[0]];
+	std::string saveDestination = pcdFilename;
 	saveDestination.replace(saveDestination.find_last_of("."),1,"_entropy.");
 	if ( outputCloud->size() > 0 )
 		pcl::io::savePCDFileASCII (saveDestination, *outputCloud );
 	else
 		PCL_ERROR ("Empty cloud. Saving error.\n");
+}
 
+int main( int argc, char** argv ) {
+	pcl::PointCloud< PointT >::Ptr inputCloud (new pcl::PointCloud< PointT >);
+	pcl::PointCloud< PointTypeWithEntropy >::Ptr outputCloud (new pcl::PointCloud< PointTypeWithEntropy >);
+
+	// get pointcloud
+	std::vector<int> fileIndices = pcl::console::parse_file_extension_argument (argc, argv, ".pcd");
+	if (pcl::io::loadPCDFile< PointT > (argv[fileIndices[0]], *inputCloud) == -1)
+	{
+		PCL_ERROR ("Couldn't read file.\n");
+		return (-1);
+	}
+
+	// get parameters if given
+	int stepSize = 1;
+	double radius = 0.3;
+	int minNeighbors = 15;
+
+	pcl::console::parse_argument (argc, argv, "-stepsize", stepSize);
+    pcl::console::parse_argument (argc, argv, "-radius", radius);
+	bool punishSolitaryPoints = pcl::console::find_switch (argc, argv, "-punishSolitaryPoints");
+    pcl::console::parse_argument (argc, argv, "-minNeighbors", minNeighbors);
+    
+    computeEntropyMain(inputCloud, outputCloud, stepSize, radius, punishSolitaryPoints, minNeighbors);
+    
+	std::string pcdFilename = argv[fileIndices[0]];
+    save(outputCloud, pcdFilename);
 	return 0;
 }
