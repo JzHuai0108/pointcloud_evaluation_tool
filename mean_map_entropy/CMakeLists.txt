@@ -14,5 +14,5 @@ if (OPENMP_FOUND)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
-add_executable (mean_map_entropy src/mean_map_entropy.cpp)
+add_executable (mean_map_entropy src/main.cpp src/mean_map_entropy.cpp)
 target_link_libraries (mean_map_entropy ${PCL_LIBRARIES})

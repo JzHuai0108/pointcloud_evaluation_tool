@@ -10,39 +10,7 @@
 
 #include <iostream>
 
-#include <pcl/io/pcd_io.h>
-#include <pcl/point_types.h>
-#include <pcl/common/common.h>
-#include <pcl/common/geometry.h>
-#include <pcl/common/centroid.h>
-#include <pcl/common/transforms.h>
-#include <pcl/common/time.h>
-#include <pcl/console/parse.h>
-#include <pcl/search/kdtree.h>
-#include <pcl/sample_consensus/method_types.h>
-#include <pcl/sample_consensus/model_types.h>
-#include <pcl/segmentation/sac_segmentation.h>
-#include <pcl/ModelCoefficients.h>
-
-
-struct PointTypeWithEntropy
-{
-	PCL_ADD_POINT4D;                  	// preferred way of adding a XYZ + padding
-	float entropy;
-	float planeVariance;
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW   	// make sure our new allocators are aligned
-} EIGEN_ALIGN16;                    		// enforce SSE padding for correct memory alignment
-
-POINT_CLOUD_REGISTER_POINT_STRUCT (PointTypeWithEntropy,
-		(float, x, x)
-		(float, y, y)
-		(float, z, z)
-		(float, entropy, entropy)
-		(float, planeVariance, planeVariance)
-)
-
-typedef pcl::PointXYZ PointT;
-
+#include "mean_map_entropy.h"
 
 double computeEntropy( pcl::PointCloud< PointT >::Ptr cloud ){
 
@@ -103,8 +71,8 @@ double computePlaneVariance( pcl::PointCloud< PointT >::Ptr cloud ){
 
 void computeEntropyMain(pcl::PointCloud< PointT >::Ptr inputCloud, 
         pcl::PointCloud< PointTypeWithEntropy >::Ptr outputCloud, 
-		int stepSize = 1, double radius = 0.3, 
-		bool punishSolitaryPoints = false, int minNeighbors = 15) {
+		int stepSize, double radius, 
+		bool punishSolitaryPoints, int minNeighbors) {
     std::cout << "Stepsize = " << stepSize << std::endl;
 	std::cout << "Radius for neighborhood search = " << radius << std::endl;
 	if( !punishSolitaryPoints ){
@@ -219,33 +187,4 @@ void save(pcl::PointCloud< PointTypeWithEntropy >::Ptr outputCloud, const std::s
 		pcl::io::savePCDFileASCII (saveDestination, *outputCloud );
 	else
 		PCL_ERROR ("Empty cloud. Saving error.\n");
-}
-
-int main( int argc, char** argv ) {
-	pcl::PointCloud< PointT >::Ptr inputCloud (new pcl::PointCloud< PointT >);
-	pcl::PointCloud< PointTypeWithEntropy >::Ptr outputCloud (new pcl::PointCloud< PointTypeWithEntropy >);
-
-	// get pointcloud
-	std::vector<int> fileIndices = pcl::console::parse_file_extension_argument (argc, argv, ".pcd");
-	if (pcl::io::loadPCDFile< PointT > (argv[fileIndices[0]], *inputCloud) == -1)
-	{
-		PCL_ERROR ("Couldn't read file.\n");
-		return (-1);
-	}
-
-	// get parameters if given
-	int stepSize = 1;
-	double radius = 0.3;
-	int minNeighbors = 15;
-
-	pcl::console::parse_argument (argc, argv, "-stepsize", stepSize);
-    pcl::console::parse_argument (argc, argv, "-radius", radius);
-	bool punishSolitaryPoints = pcl::console::find_switch (argc, argv, "-punishSolitaryPoints");
-    pcl::console::parse_argument (argc, argv, "-minNeighbors", minNeighbors);
-    
-    computeEntropyMain(inputCloud, outputCloud, stepSize, radius, punishSolitaryPoints, minNeighbors);
-    
-	std::string pcdFilename = argv[fileIndices[0]];
-    save(outputCloud, pcdFilename);
-	return 0;
 }
